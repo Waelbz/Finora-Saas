@@ -166,7 +166,7 @@ export default function LandingPage() {
                       : 'bg-white/10 text-white hover:bg-white/15'
                   }`}
                 >
-                  {plan.price === 'Gratuit' ? 'Commencer' : 'Essayer 14 jours gratuit'}
+                  {plan.price === 'Gratuit' ? 'Commencer' : 'Commencer'}
                 </Link>
               </div>
             ))}
@@ -217,7 +217,7 @@ const PLANS = [
   {
     id: 'pro',
     name: 'Finora',
-    desc: 'Accès complet — tous les modules sans limite',
+    desc: '49€/mois · ou 412€/an (-30%)',
     price: '49€',
     featured: true,
     features: ['Sociétés illimitées', 'Factures illimitées', 'Relevés illimités', 'Salariés illimités', 'Facturation Électronique 2026', 'Audit IA complet', 'Expert IA illimité', 'Export ARF · FEC · PDF · CSV', 'Toutes les mises à jour'],
