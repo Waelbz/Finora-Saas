@@ -216,18 +216,10 @@ const PLANS = [
   },
   {
     id: 'pro',
-    name: 'Pro',
-    desc: 'Pour les indépendants et TPE',
-    price: '29€',
+    name: 'Finora',
+    desc: 'Accès complet — tous les modules sans limite',
+    price: '49€',
     featured: true,
-    features: ['5 sociétés', '200 factures/mois', '20 relevés bancaires', '20 salariés', 'Facturation Électronique 2026', 'Audit IA complet', 'Expert IA illimité', 'Export PDF premium'],
-  },
-  {
-    id: 'cabinet',
-    name: 'Cabinet',
-    desc: 'Pour les cabinets comptables',
-    price: '99€',
-    featured: false,
-    features: ['Sociétés illimitées', 'Tout illimité', 'API dédiée', 'Support prioritaire', 'Formation incluse', 'Multi-utilisateurs'],
+    features: ['Sociétés illimitées', 'Factures illimitées', 'Relevés illimités', 'Salariés illimités', 'Facturation Électronique 2026', 'Audit IA complet', 'Expert IA illimité', 'Export ARF · FEC · PDF · CSV', 'Toutes les mises à jour'],
   },
 ]
