@@ -60,7 +60,7 @@ export default function LandingPage() {
 
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/sign-up" className="inline-flex items-center gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-violet-500 to-violet-400 text-white font-bold text-base shadow-[0_8px_32px_rgba(108,71,255,.4)] hover:shadow-[0_12px_40px_rgba(108,71,255,.5)] hover:-translate-y-0.5 transition-all duration-200">
-              Commencer gratuitement
+              Commencer
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
             </Link>
             <a href="#features" className="inline-flex items-center gap-2 h-12 px-8 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-base hover:bg-white/10 transition-all">
@@ -69,7 +69,7 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-6 text-sm text-white/30">
-            Gratuit jusqu'à 10 factures/mois · Aucune carte bancaire requise
+            Sans engagement · Annulable à tout moment
           </p>
         </div>
       </section>
@@ -166,7 +166,7 @@ export default function LandingPage() {
                       : 'bg-white/10 text-white hover:bg-white/15'
                   }`}
                 >
-                  {plan.price === 'Gratuit' ? 'Démarrer gratuitement' : 'Essayer 14 jours gratuit'}
+                  {plan.price === 'Gratuit' ? 'Commencer' : 'Essayer 14 jours gratuit'}
                 </Link>
               </div>
             ))}
