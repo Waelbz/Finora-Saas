@@ -112,8 +112,8 @@ Réponds en français, de façon précise et professionnelle. Utilise des exempl
   }
 
   const toggleVoice = () => {
-    const SR = (window as any).SpeechRecognition ||
-               (window as any).webkitSpeechRecognition
+    const SR = (window as any).any ||
+               (window as any).webkitany
     if (!SR) { alert('Reconnaissance vocale non disponible. Utilisez Chrome.'); return }
 
     if (recording && recognition) {
