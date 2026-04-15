@@ -25,7 +25,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [chatFile, setChatFile] = useState<File | null>(null)
   const [recording, setRecording] = useState(false)
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
+  const [recognition, setRecognition] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -122,7 +122,7 @@ Réponds en français, de façon précise et professionnelle. Utilise des exempl
 
     const rec = new SR()
     rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = false
-    rec.onresult = (e: SpeechRecognitionEvent) => {
+    rec.onresult = (e: anyEvent) => {
       const t = Array.from(e.results).map(r => r[0].transcript).join('')
       setInput(t)
     }
