@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrCreateProfile } from '@/lib/actions/profile'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data, error } = await admin
     .from('companies')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .eq('profile_id', profile.id)
     .single()
 
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ data })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data, error } = await admin
     .from('companies')
     .update(body)
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .eq('profile_id', profile.id)
     .select()
     .single()
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ data })
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -55,7 +55,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const { error } = await admin
     .from('companies')
     .delete()
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .eq('profile_id', profile.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
