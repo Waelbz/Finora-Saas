@@ -85,7 +85,7 @@ export default function PayrollPage() {
         const b64 = (r.result as string).split(',')[1]
         const sys = `Expert-comptable. Extrait les données de ce bulletin de paie en JSON UNIQUEMENT sans backticks.
 {"salarie":"PRENOM NOM","poste":"Intitulé poste","contrat":"CDI","brut":3000.00,"cotis_sal_pct":22.0,"cotis_pat_pct":42.0,"pas":0.0,"tr_val":9.0,"tr_pct":50.0,"net":2200.00,"periode":"03/2026"}`
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        const resp = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
           body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 512, system: sys, messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } }, { type: 'text', text: 'Extrait les données.' }] }] })

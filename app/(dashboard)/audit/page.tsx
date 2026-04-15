@@ -51,7 +51,7 @@ Score 0-100. Severity: ok/warning/error.`
         const b64 = await toBase64(f)
         const isPdf = f.type === 'application/pdf'
 
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        const resp = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
           body: JSON.stringify({
@@ -84,7 +84,7 @@ Score 0-100. Severity: ok/warning/error.`
         finalResult = JSON.parse(analyses[0].replace(/```json\n?|```\n?/g, '').trim())
         finalResult.files_analyzed = files.length
       } else {
-        const synthResp = await fetch('https://api.anthropic.com/v1/messages', {
+        const synthResp = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
           body: JSON.stringify({

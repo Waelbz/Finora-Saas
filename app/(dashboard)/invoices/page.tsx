@@ -53,14 +53,11 @@ export default function InvoicesPage() {
         const base64 = await toBase64(files[i])
         const isPdf = files[i].type === 'application/pdf'
 
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('/api/claude', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
+                },
           body: JSON.stringify({
             model: 'claude-opus-4-5',
             max_tokens: 2048,
