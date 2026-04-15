@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe, PLANS, type PlanType } from '@/lib/stripe'

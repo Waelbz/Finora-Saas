@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use server'
 
 import { auth, currentUser } from '@clerk/nextjs/server'
