@@ -122,7 +122,7 @@ Réponds en français, de façon précise et professionnelle. Utilise des exempl
 
     const rec = new SR()
     rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = false
-    rec.onresult = (e: anyEvent) => {
+    rec.onresult = (e: any) => {
       const t = Array.from(e.results).map(r => r[0].transcript).join('')
       setInput(t)
     }
