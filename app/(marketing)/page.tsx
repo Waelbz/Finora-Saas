@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+
 
 export default function LandingPage() {
   return (
@@ -29,20 +29,8 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <SignedOut>
-            <Link href="/sign-in" className="text-sm text-white/70 hover:text-white transition-colors px-4 py-2">
-              Connexion
-            </Link>
-            <Link href="/sign-up" className="btn btn-primary text-sm h-9">
-              Démarrer gratuitement
-            </Link>
-          </SignedOut>
-          <SignedIn>
-            <Link href="/dashboard" className="btn btn-primary text-sm h-9">
-              Tableau de bord
-            </Link>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          
+          
         </div>
       </nav>
 
