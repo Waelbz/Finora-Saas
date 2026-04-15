@@ -90,7 +90,7 @@ export default async function DashboardPage() {
                   <div className="empty-icon">🏢</div>
                   <div className="empty-title">Aucune société</div>
                   <div className="empty-sub">Créez votre première société pour commencer</div>
-                  <a href="/companies/new" className="btn btn-primary mt-4">
+                  <a href="/companies" className="btn btn-primary mt-4">
                     + Créer une société
                   </a>
                 </div>

@@ -167,7 +167,7 @@ export default function Sidebar({ profile, companies, currentCompany, onCompanyC
           </Link>
 
           {/* Modules société */}
-          {currentCompany && (
+          {(
             <>
               <div className="px-3 pt-4 pb-1.5">
                 <span className="text-[9px] font-semibold text-white/25 uppercase tracking-[.12em] font-mono">
