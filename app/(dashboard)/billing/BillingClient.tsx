@@ -41,7 +41,7 @@ export default function BillingClient({ currentPlan }: BillingClientProps) {
             }`}
           >
             {i === 'monthly' ? 'Mensuel' : 'Annuel'}
-            {i === 'yearly' && <span className="ml-2 text-[10px] font-bold text-green-500">-23%</span>}
+            {i === 'yearly' && <span className="ml-2 text-[10px] font-bold text-green-500">-30%</span>}
           </button>
         ))}
       </div>
@@ -71,10 +71,10 @@ export default function BillingClient({ currentPlan }: BillingClientProps) {
           </div>
           <div className="mb-4 mt-2"><div className="font-bold text-lg font-display">Finora</div><div className="text-sm text-[#858aaa]">Tous les modules, sans limite</div></div>
           <div className="mb-1">
-            <span className="text-3xl font-extrabold font-display">{interval === 'monthly' ? '49€' : '452€'}</span>
+            <span className="text-3xl font-extrabold font-display">{interval === 'monthly' ? '49€' : '412€'}</span>
             <span className="text-[#858aaa] text-sm ml-1">/{interval === 'monthly' ? 'mois' : 'an'}</span>
           </div>
-          {interval === 'yearly' && <div className="text-xs text-green-600 font-semibold mb-3">Soit 37,67€/mois — économisez 136€/an</div>}
+          {interval === 'yearly' && <div className="text-xs text-green-600 font-semibold mb-3">Soit 34,33€/mois — économisez 176€/an</div>}
           <ul className="space-y-2 mb-6 mt-3">
             {['Sociétés illimitées', 'Factures illimitées', 'Relevés bancaires illimités', 'Salariés illimités', 'Facturation Électronique 2026', 'Audit IA complet', 'Expert IA illimité', 'Export ARF · FEC · PDF · CSV', 'Toutes les mises à jour incluses'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-[#3d4263]">
@@ -90,7 +90,7 @@ export default function BillingClient({ currentPlan }: BillingClientProps) {
           ) : (
             <button onClick={handleUpgrade} disabled={loading}
               className="w-full h-10 rounded-xl bg-gradient-to-r from-violet-500 to-violet-400 text-white text-sm font-bold shadow-violet hover:brightness-110 transition-all disabled:opacity-60">
-              {loading ? 'Redirection…' : `S'abonner — ${interval === 'monthly' ? '49€/mois' : '452€/an'}`}
+              {loading ? 'Redirection…' : `S'abonner — ${interval === 'monthly' ? '49€/mois' : '412€/an'}`}
             </button>
           )}
         </div>
