@@ -1,24 +1,8 @@
 // @ts-nocheck
 import Link from 'next/link'
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
-interface Feature {
-  icon: string
-  title: string
-  desc: string
-  badge?: string
-}
-
-interface Plan {
-  id: string
-  name: string
-  desc: string
-  price: string
-  period: string
-  featured: boolean
-  features: string[]
-}
-
-const FEATURES: Feature[] = [
+const FEATURES = [
   { icon: '📄', title: 'Analyse de factures', desc: "Importez vos factures fournisseurs et clients. L'IA extrait les données et génère les écritures ARF Coala pour Sage GE." },
   { icon: '🏦', title: 'Relevés bancaires', desc: 'Analysez vos relevés PDF (LCL, BNP, SG, CIC...). Génération automatique des écritures avec rapprochement comptable.' },
   { icon: '👥', title: 'Module paie', desc: 'Gérez vos salariés, calculez les bulletins de paie et exportez les écritures de paie (6411, 431, 437...).' },
@@ -30,7 +14,7 @@ const FEATURES: Feature[] = [
   { icon: '🔒', title: 'Données sécurisées', desc: 'Vos données sont stockées en Europe (Supabase). Chiffrement AES-256. Votre clé API reste privée.' },
 ]
 
-const PLANS: Plan[] = [
+const PLANS = [
   {
     id: 'monthly',
     name: 'Finora Mensuel',
@@ -53,8 +37,7 @@ const PLANS: Plan[] = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0f1117] text-white">
-      {/* NAV */}
+    <div className="min-h-screen text-white" style={{backgroundColor: '#0f1117'}}>
       <nav className="flex items-center justify-between px-8 py-5 max-w-7xl mx-auto">
         <Link href="/" className="flex items-center gap-2">
           <svg width="28" height="28" viewBox="0 0 56 56" fill="none">
@@ -71,55 +54,57 @@ export default function LandingPage() {
           <span className="text-lg font-bold">Finora</span>
         </Link>
         <div className="flex items-center gap-6">
-          <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">Fonctionnalités</a>
-          <a href="#pricing" className="text-sm text-white/70 hover:text-white transition-colors">Tarifs</a>
-          <a href="#faq" className="text-sm text-white/70 hover:text-white transition-colors">FAQ</a>
+          <a href="#features" className="text-sm text-white/70 hover:text-white">Fonctionnalités</a>
+          <a href="#pricing" className="text-sm text-white/70 hover:text-white">Tarifs</a>
+          <a href="#faq" className="text-sm text-white/70 hover:text-white">FAQ</a>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/sign-in" className="text-sm text-white/70 hover:text-white px-4 py-2">
-            Connexion
-          </Link>
-          <Link href="/sign-up" className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-            Commencer
-          </Link>
+          <SignedOut>
+            <Link href="/sign-in" className="text-sm text-white/70 hover:text-white px-4 py-2">Connexion</Link>
+            <Link href="/sign-up" className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Commencer</Link>
+          </SignedOut>
+          <SignedIn>
+            <Link href="/dashboard" className="text-sm text-white/70 hover:text-white px-4 py-2">Tableau de bord</Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </nav>
 
-      {/* HERO */}
       <section className="relative px-8 py-28 text-center max-w-5xl mx-auto">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.07] text-sm text-white/70 mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
           Réforme facture électronique 2026 — Finora est prêt
         </div>
-
         <h1 className="text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] mb-6">
           La comptabilité{' '}
           <span className="bg-gradient-to-r from-violet-400 via-violet-500 to-teal-400 bg-clip-text text-transparent">intelligente</span>
           <br />
           pour les pros français
         </h1>
-
         <p className="text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
           Analysez vos factures, relevés bancaires et bulletins de paie avec l'IA.
           Exportez directement vers <span className="text-white font-semibold">Sage Génération Expert</span> en format ARF Coala.
         </p>
-
         <div className="flex justify-center gap-4 flex-wrap">
-          <Link href="/sign-up" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 text-white font-semibold rounded-xl shadow-[0_12px_40px_rgba(108,71,255,.5)] hover:-translate-y-0.5 transition-all">
-            Commencer
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </Link>
-          <a href="#features" className="inline-flex items-center gap-2 h-12 px-6 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-white font-semibold rounded-xl transition-all">
+          <SignedOut>
+            <Link href="/sign-up" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-xl">
+              Commencer
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <Link href="/dashboard" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-xl">
+              Accéder au tableau de bord
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+          </SignedIn>
+          <a href="#features" className="inline-flex items-center gap-2 h-12 px-6 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-white font-semibold rounded-xl">
             Voir les fonctionnalités
           </a>
         </div>
-
-        <div className="mt-6 text-sm text-white/30">
-          Sans engagement · Annulable à tout moment
-        </div>
+        <div className="mt-6 text-sm text-white/30">Sans engagement · Annulable à tout moment</div>
       </section>
 
-      {/* LOGOS */}
       <section className="py-12 px-8 max-w-5xl mx-auto border-t border-white/[0.05]">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 text-center">
           {[
@@ -128,7 +113,7 @@ export default function LandingPage() {
             { label: 'Réforme', value: '2026 Prêt' },
             { label: 'Export', value: 'FEC · PDF · CSV' },
             { label: 'Moteur IA', value: 'Claude Anthropic' },
-          ].map((item: { label: string; value: string }) => (
+          ].map((item) => (
             <div key={item.value}>
               <div className="text-lg font-bold font-mono tracking-tight">{item.value}</div>
               <div className="text-xs text-white/40 mt-1">{item.label}</div>
@@ -137,16 +122,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FEATURES */}
       <section id="features" className="py-24 px-8 max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-5xl font-bold mb-4">Tout ce dont vous avez besoin</h2>
           <p className="text-xl text-white/50">Un assistant comptable complet, conçu pour les cabinets et entreprises françaises</p>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {FEATURES.map((feat: Feature) => (
-            <div key={feat.title} className="p-6 bg-white/[0.03] border border-white/[0.07] rounded-2xl hover:bg-white/[0.05] transition-all">
+          {FEATURES.map((feat) => (
+            <div key={feat.title} className="p-6 bg-white/[0.03] border border-white/[0.07] rounded-2xl">
               <div className="text-3xl mb-4">{feat.icon}</div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-lg font-semibold">{feat.title}</h3>
@@ -158,58 +141,53 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING */}
       <section id="pricing" className="py-24 px-8 max-w-5xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-5xl font-bold mb-4">Tarifs transparents</h2>
           <p className="text-xl text-white/50">Un seul plan, deux modes de facturation</p>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          {PLANS.map((plan: Plan) => (
+          {PLANS.map((plan) => (
             <div
               key={plan.id}
-              className={`relative p-8 rounded-3xl border transition-all ${plan.featured
-                ? 'bg-gradient-to-b from-violet-500/20 to-violet-500/5 border-violet-500/40 shadow-[0_0_60px_rgba(108,71,255,.15)]'
-                : 'bg-white/[0.03] border-white/[0.07] hover:bg-white/[0.06]'}`}
+              className={'relative p-8 rounded-3xl border ' + (plan.featured
+                ? 'bg-gradient-to-b from-violet-500/20 to-violet-500/5 border-violet-500/40'
+                : 'bg-white/[0.03] border-white/[0.07]')}
             >
               {plan.featured && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="px-3 py-1 text-xs font-bold bg-violet-600 text-white rounded-full">Économique</span>
                 </div>
               )}
-
               <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
               <p className="text-sm text-white/50 mb-6">{plan.desc}</p>
-
               <div className="mb-6">
                 <span className="text-5xl font-bold">{plan.price}</span>
                 <span className="text-white/50 ml-1">{plan.period}</span>
               </div>
-
               <ul className="space-y-3 mb-8">
-                {plan.features.map((f: string) => (
+                {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 mt-0.5"><path d="M3 9L7 13L15 5" stroke="#1fd9a4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     <span className="text-white/80">{f}</span>
                   </li>
                 ))}
               </ul>
-
-              <Link
-                href="/sign-up"
-                className={`block text-center w-full py-3 rounded-xl font-semibold transition-all ${plan.featured
-                  ? 'bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 text-white'
-                  : 'bg-white/[0.08] hover:bg-white/[0.12] text-white'}`}
-              >
-                Commencer
-              </Link>
+              <SignedOut>
+                <Link href={'/sign-up?plan=' + plan.id} className={'block text-center w-full py-3 rounded-xl font-semibold ' + (plan.featured ? 'bg-violet-600 text-white' : 'bg-white/[0.08] text-white')}>
+                  Commencer
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <Link href={'/billing?plan=' + plan.id} className={'block text-center w-full py-3 rounded-xl font-semibold ' + (plan.featured ? 'bg-violet-600 text-white' : 'bg-white/[0.08] text-white')}>
+                  Souscrire
+                </Link>
+              </SignedIn>
             </div>
           ))}
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="py-12 px-8 border-t border-white/[0.05]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -217,9 +195,9 @@ export default function LandingPage() {
             <span className="text-white/30 text-sm">· Comptabilité IA française</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-white/50">
-            <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
-            <a href="#" className="hover:text-white transition-colors">CGU</a>
-            <a href="#" className="hover:text-white transition-colors">Confidentialité</a>
+            <a href="#" className="hover:text-white">Mentions légales</a>
+            <a href="#" className="hover:text-white">CGU</a>
+            <a href="#" className="hover:text-white">Confidentialité</a>
             <span className="text-white/30">© 2026 Finora</span>
           </div>
         </div>
