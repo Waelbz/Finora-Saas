@@ -17,10 +17,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { plan } = body
 
-    // Choisir le bon Price ID selon le plan
     const priceId = plan === 'yearly'
-      ? process.env.STRIPE_PRICE_YEARLY
-      : process.env.STRIPE_PRICE_MONTHLY
+      ? process.env.STRIPE_PRICE_PRO_YEARLY
+      : process.env.STRIPE_PRICE_PRO_MONTHLY
 
     if (!priceId) {
       return NextResponse.json({ error: 'Price ID non configuré pour ' + plan }, { status: 500 })
