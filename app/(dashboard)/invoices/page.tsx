@@ -1,13 +1,14 @@
 // @ts-nocheck
 'use client'
-
 import { useState, useRef } from 'react'
-import { Upload, FileText, Download, Copy, RotateCcw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Upload, FileText, Download, Copy, RotateCcw, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
 
 interface InvoiceResult {
   filename: string
   status: 'waiting' | 'processing' | 'done' | 'error'
+  type: 'fournisseur' | 'client'
   fournisseur?: string
+  client?: string
   montant_ttc?: number
   journal?: string
   arf_lines?: string
@@ -15,10 +16,10 @@ interface InvoiceResult {
 }
 
 export default function InvoicesPage() {
+  const [invoiceType, setInvoiceType] = useState<'fournisseur' | 'client'>('fournisseur')
   const [files, setFiles] = useState<File[]>([])
   const [results, setResults] = useState<InvoiceResult[]>([])
   const [processing, setProcessing] = useState(false)
-  const [apiKey, setApiKey] = useState(() => typeof window !== 'undefined' ? sessionStorage.getItem('finora_key') || '' : '')
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -29,7 +30,7 @@ export default function InvoicesPage() {
     setFiles(prev => [...prev, ...arr])
     setResults(prev => [
       ...prev,
-      ...arr.map(f => ({ filename: f.name, status: 'waiting' as const }))
+      ...arr.map(f => ({ filename: f.name, status: 'waiting' as const, type: invoiceType }))
     ])
   }
 
@@ -42,276 +43,169 @@ export default function InvoicesPage() {
 
   const analyzeAll = async () => {
     if (!files.length) return
-    if (!apiKey) { alert('Configurez votre clé API Anthropic dans Paramètres'); return }
-
     setProcessing(true)
+
+    const toBase64 = (f: File) => new Promise<string>((res, rej) => {
+      const r = new FileReader()
+      r.onload = () => res((r.result as string).split(',')[1])
+      r.onerror = rej
+      r.readAsDataURL(f)
+    })
 
     for (let i = 0; i < files.length; i++) {
       setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'processing' } : r))
 
       try {
-        const base64 = await toBase64(files[i])
-        const isPdf = files[i].type === 'application/pdf'
+        const b64 = await toBase64(files[i])
+        const sys = invoiceType === 'fournisseur'
+          ? `Expert-comptable français. Analyse cette facture FOURNISSEUR. Retourne JSON: {"fournisseur":"NOM","montant_ttc":123.45,"montant_ht":100,"tva":23.45,"date":"01/03/2026","journal":"HA","compte":"401NOM","arf":"ligne ARF Coala"}`
+          : `Expert-comptable français. Analyse cette facture CLIENT. Retourne JSON: {"client":"NOM","montant_ttc":123.45,"montant_ht":100,"tva":23.45,"date":"01/03/2026","journal":"VT","compte":"411NOM","arf":"ligne ARF Coala"}`
 
-        const res = await fetch('/api/claude', {
+        const resp = await fetch('/api/claude', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-                },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'claude-opus-4-5',
             max_tokens: 2048,
-            system: `Tu es un expert-comptable français. Analyse cette facture et génère les écritures comptables ARF Coala.
-Réponds UNIQUEMENT avec un JSON valide sans backticks:
-{
-  "fournisseur": "NOM FOURNISSEUR",
-  "numero": "FA-2026-001",
-  "date": "2026-01-15",
-  "montant_ht": 1000.00,
-  "tva": 200.00,
-  "montant_ttc": 1200.00,
-  "type": "achat",
-  "compte_fournisseur": "401NOM",
-  "journal": "HA",
-  "arf": "01/01/2026\tHA\t401NOM\tFA001\tFournisseur NOM\tC\t1200,000\nE\n01/01/2026\tHA\t445660\tFA001\tTVA déductible\tD\t200,000\nE\n01/01/2026\tHA\t607100\tFA001\tAchat marchandises\tD\t1000,000\nE"
-}`,
+            system: sys,
             messages: [{
               role: 'user',
               content: [
-                isPdf
-                  ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-                  : { type: 'image', source: { type: 'base64', media_type: files[i].type, data: base64 } },
-                { type: 'text', text: 'Analyse cette facture et génère les écritures ARF.' }
+                { type: files[i].type === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: files[i].type, data: b64 } },
+                { type: 'text', text: 'Analyse cette facture et retourne le JSON' }
               ]
             }]
           })
         })
 
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error?.message || `Erreur API ${res.status}`)
-
-        const raw = data.content?.find((b: { type: string }) => b.type === 'text')?.text || '{}'
-        const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+        if (!resp.ok) throw new Error('Erreur ' + resp.status)
+        const data = await resp.json()
+        const raw = data.content?.find((b: any) => b.type === 'text')?.text || '{}'
+        const parsed = JSON.parse(raw.replace(/\`\`\`json\n?|\`\`\`\n?/g, '').trim())
 
         setResults(prev => prev.map((r, idx) => idx === i ? {
           ...r,
           status: 'done',
+          type: invoiceType,
           fournisseur: parsed.fournisseur,
+          client: parsed.client,
           montant_ttc: parsed.montant_ttc,
           journal: parsed.journal,
-          arf_lines: parsed.arf,
+          arf_lines: parsed.arf
         } : r))
-
-        // Sauvegarder en BDD via API
-        await fetch('/api/invoices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company_id: localStorage.getItem('finora_current_company'),
-            filename: files[i].name,
-            type: parsed.type || 'achat',
-            supplier: parsed.fournisseur,
-            amount_ht: parsed.montant_ht,
-            tva: parsed.tva,
-            amount_ttc: parsed.montant_ttc,
-            date_invoice: parsed.date,
-            journal: parsed.journal || 'HA',
-            arf_lines: parsed.arf,
-            raw_analysis: parsed,
-          })
-        }).catch(() => {}) // Non bloquant
-
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Erreur inconnue'
-        setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error', error: message } : r))
+      } catch (e: any) {
+        setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error', error: e.message } : r))
       }
     }
 
     setProcessing(false)
   }
 
-  const exportARF = () => {
-    const doneResults = results.filter(r => r.status === 'done' && r.arf_lines)
-    if (!doneResults.length) return
-    const content = 'COMPTABILITE "dossier"  DU 01/01/2026  AU  31/12/2026\nPLAN COMPTABLE\nECRITURES\n' +
-      doneResults.map(r => r.arf_lines).join('\n')
-    download(`export_factures_${Date.now()}.arf`, content, 'text/plain')
+  const copyAllARF = async () => {
+    const arf = results.filter(r => r.arf_lines).map(r => r.arf_lines).join('\n')
+    await navigator.clipboard.writeText(arf)
   }
 
-  const copyARF = () => {
-    const doneResults = results.filter(r => r.status === 'done' && r.arf_lines)
-    if (!doneResults.length) return
-    const content = doneResults.map(r => r.arf_lines).join('\n')
-    navigator.clipboard.writeText(content)
+  const downloadARF = () => {
+    const arf = `COMPTABILITE "dossier"  DU 01/01/2026  AU  31/12/2026\nPLAN COMPTABLE\nECRITURES\n` +
+      results.filter(r => r.arf_lines).map(r => r.arf_lines).join('\n')
+    const blob = new Blob([arf], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `factures_${invoiceType}_${Date.now()}.txt`
+    a.click(); URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="animate-page-in">
-      {/* Topbar */}
+    <div>
       <div className="bg-[#111827] border-b border-white/[0.07] px-8 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-white font-bold text-lg font-display">Factures</h1>
-          <p className="text-white/40 text-sm mt-0.5">Analysez une ou plusieurs factures — export ARF Sage GE</p>
+          <h1 className="text-white font-bold text-lg">Factures</h1>
+          <p className="text-white/40 text-sm">Analysez vos factures fournisseurs et clients — export ARF Sage GE</p>
         </div>
-        <div className="flex items-center gap-2">
-          {results.some(r => r.status === 'done') && (
-            <>
-              <button onClick={copyARF} className="btn btn-sm gap-1.5">
-                <Copy className="w-3.5 h-3.5" /> Copier ARF
-              </button>
-              <button onClick={exportARF} className="btn btn-sm gap-1.5">
-                <Download className="w-3.5 h-3.5" /> Télécharger ARF
-              </button>
-            </>
-          )}
-          {files.length > 0 && (
-            <button onClick={reset} className="btn btn-sm gap-1.5">
-              <RotateCcw className="w-3.5 h-3.5" /> Vider
-            </button>
-          )}
-        </div>
+        {results.length > 0 && (
+          <button onClick={reset} className="btn btn-sm">
+            <RotateCcw className="w-3.5 h-3.5" /> Réinitialiser
+          </button>
+        )}
       </div>
 
       <div className="p-8 max-w-4xl">
-        {/* Upload zone */}
-        {files.length === 0 && (
-          <div
-            className={`upload-zone mb-6 ${dragging ? 'border-violet-500 bg-violet-50' : ''}`}
-            onDragOver={e => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
-            onClick={() => inputRef.current?.click()}
+        {/* Tabs Fournisseurs / Clients */}
+        <div className="flex gap-2 mb-6 border-b border-white/[0.07] pb-2">
+          <button
+            onClick={() => { setInvoiceType('fournisseur'); reset(); }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${invoiceType === 'fournisseur' ? 'bg-violet-600 text-white' : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08]'}`}
           >
-            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
+            📄 Factures fournisseurs
+          </button>
+          <button
+            onClick={() => { setInvoiceType('client'); reset(); }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${invoiceType === 'client' ? 'bg-violet-600 text-white' : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08]'}`}
+          >
+            🧾 Factures clients
+          </button>
+        </div>
+
+        {/* Zone de dépôt */}
+        <label
+          className={`upload-zone block cursor-pointer ${dragging ? 'border-violet-500' : ''}`}
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
+          onClick={() => inputRef.current?.click()}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
+            multiple
+            className="hidden"
+            onChange={e => e.target.files && addFiles(e.target.files)}
+          />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-400/10 flex items-center justify-center">
               <Upload className="w-7 h-7 text-violet-500" />
             </div>
-            <div className="text-base font-bold text-[#0f1117] mb-1">Déposer vos factures</div>
-            <div className="text-sm text-[#858aaa]">1 ou plusieurs fichiers · PDF · PNG · JPG · glissez ou cliquez</div>
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              accept=".pdf,.png,.jpg,.jpeg,.webp"
-              className="hidden"
-              onChange={e => e.target.files && addFiles(e.target.files)}
-            />
-          </div>
-        )}
-
-        {/* Files list */}
-        {files.length > 0 && (
-          <div className="space-y-3 mb-6">
-            {files.map((file, idx) => {
-              const result = results[idx]
-              return (
-                <div key={idx} className="card card-body flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-violet-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[#0f1117] truncate text-sm">{file.name}</div>
-                    <div className="text-xs text-[#858aaa] mt-0.5">
-                      {(file.size / 1024).toFixed(0)} KB
-                      {result?.fournisseur && ` · ${result.fournisseur}`}
-                      {result?.montant_ttc && ` · ${result.montant_ttc.toLocaleString('fr-FR')} €`}
-                    </div>
-                    {result?.status === 'done' && result.arf_lines && (
-                      <pre className="mt-2 text-[10px] font-mono bg-[#f4f5f9] rounded-lg p-2 overflow-x-auto text-[#3d4263] max-h-24">
-                        {result.arf_lines}
-                      </pre>
-                    )}
-                    {result?.status === 'error' && (
-                      <div className="text-xs text-red-500 mt-1">{result.error}</div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {result?.status === 'waiting' && (
-                      <span className="badge badge-gray">En attente</span>
-                    )}
-                    {result?.status === 'processing' && (
-                      <span className="flex items-center gap-1.5 text-xs text-violet-500">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyse…
-                      </span>
-                    )}
-                    {result?.status === 'done' && (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    )}
-                    {result?.status === 'error' && (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    )}
-                    {!processing && (
-                      <button
-                        onClick={() => removeFile(idx)}
-                        className="w-6 h-6 rounded-lg hover:bg-red-50 flex items-center justify-center text-[#858aaa] hover:text-red-500 transition-colors"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Add more */}
-            <button
-              onClick={() => inputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-[#dde1ef] text-sm text-[#858aaa] hover:border-violet-300 hover:text-violet-500 transition-all"
-            >
-              <Upload className="w-4 h-4" /> Ajouter des fichiers
-            </button>
-          </div>
-        )}
-
-        {/* Analyze button */}
-        {files.length > 0 && !results.every(r => r.status === 'done') && (
-          <button
-            onClick={analyzeAll}
-            disabled={processing}
-            className="btn btn-primary w-full max-w-xs h-11 text-base disabled:opacity-60"
-          >
-            {processing ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</>
-            ) : (
-              <><CheckCircle className="w-4 h-4" /> Analyser {files.length > 1 ? `les ${files.length} factures` : 'la facture'}</>
-            )}
-          </button>
-        )}
-
-        {/* All done summary */}
-        {results.length > 0 && results.every(r => r.status === 'done' || r.status === 'error') && !processing && (
-          <div className="mt-4 p-4 rounded-xl bg-green-50 border border-green-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span className="text-sm font-semibold text-green-700">
-                {results.filter(r => r.status === 'done').length} facture(s) traitée(s)
-                {results.filter(r => r.status === 'error').length > 0 &&
-                  ` · ${results.filter(r => r.status === 'error').length} erreur(s)`}
-              </span>
+            <div>
+              <div className="font-semibold">Déposer {invoiceType === 'fournisseur' ? 'vos factures fournisseurs' : 'vos factures clients'}</div>
+              <div className="text-sm text-[#858aaa] mt-1">1 ou plusieurs fichiers · PDF · PNG · JPG · glissez ou cliquez</div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={copyARF} className="btn btn-sm">⎘ Copier ARF</button>
-              <button onClick={exportARF} className="btn btn-primary btn-sm">⬇ Télécharger ARF</button>
+          </div>
+        </label>
+
+        {/* Liste des fichiers */}
+        {results.length > 0 && (
+          <div className="mt-6 space-y-2">
+            {results.map((r, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/[0.07] rounded-xl">
+                <div className="text-2xl">{r.status === 'done' ? '✅' : r.status === 'error' ? '❌' : r.status === 'processing' ? '⏳' : '⏸️'}</div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-white">{r.filename}</div>
+                  {r.fournisseur && <div className="text-xs text-white/50">Fournisseur: {r.fournisseur} · {r.montant_ttc?.toFixed(2)}€</div>}
+                  {r.client && <div className="text-xs text-white/50">Client: {r.client} · {r.montant_ttc?.toFixed(2)}€</div>}
+                  {r.error && <div className="text-xs text-red-400">{r.error}</div>}
+                </div>
+                {r.status === 'waiting' && (
+                  <button onClick={() => removeFile(i)} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
+                )}
+              </div>
+            ))}
+
+            <div className="flex gap-3 pt-4">
+              <button onClick={analyzeAll} disabled={processing || !files.length} className="btn btn-primary">
+                {processing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><CheckCircle className="w-4 h-4" /> Analyser toutes les factures</>}
+              </button>
+              {results.some(r => r.status === 'done') && (
+                <>
+                  <button onClick={copyAllARF} className="btn"><Copy className="w-4 h-4" /> Copier ARF</button>
+                  <button onClick={downloadARF} className="btn"><Download className="w-4 h-4" /> Télécharger ARF</button>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
     </div>
   )
-}
-
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-function download(filename: string, content: string, type: string) {
-  const blob = new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
 }
