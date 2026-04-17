@@ -1,7 +1,5 @@
-'use client'
 // @ts-nocheck
 import Link from 'next/link'
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
 const FEATURES = [
   { icon: '📄', title: 'Analyse de factures', desc: "Importez vos factures fournisseurs et clients. L'IA extrait les données et génère les écritures ARF Coala pour Sage GE." },
@@ -60,14 +58,8 @@ export default function LandingPage() {
           <a href="#faq" className="text-sm text-white/70 hover:text-white">FAQ</a>
         </div>
         <div className="flex items-center gap-3">
-          <SignedOut>
-            <Link href="/sign-in" className="text-sm text-white/70 hover:text-white px-4 py-2">Connexion</Link>
-            <Link href="/sign-up" className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Commencer</Link>
-          </SignedOut>
-          <SignedIn>
-            <Link href="/dashboard" className="text-sm text-white/70 hover:text-white px-4 py-2">Tableau de bord</Link>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          <Link href="/sign-in" className="text-sm text-white/70 hover:text-white px-4 py-2">Connexion</Link>
+          <Link href="/dashboard" className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Commencer</Link>
         </div>
       </nav>
 
@@ -87,18 +79,10 @@ export default function LandingPage() {
           Exportez directement vers <span className="text-white font-semibold">Sage Génération Expert</span> en format ARF Coala.
         </p>
         <div className="flex justify-center gap-4 flex-wrap">
-          <SignedOut>
-            <Link href="/sign-up" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-xl">
-              Commencer
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </Link>
-          </SignedOut>
-          <SignedIn>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-xl">
-              Accéder au tableau de bord
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </Link>
-          </SignedIn>
+          <Link href="/dashboard" className="inline-flex items-center gap-2 h-12 px-6 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-xl">
+            Commencer
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </Link>
           <a href="#features" className="inline-flex items-center gap-2 h-12 px-6 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-white font-semibold rounded-xl">
             Voir les fonctionnalités
           </a>
@@ -174,16 +158,9 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <SignedOut>
-                <Link href={'/sign-up?plan=' + plan.id} className={'block text-center w-full py-3 rounded-xl font-semibold ' + (plan.featured ? 'bg-violet-600 text-white' : 'bg-white/[0.08] text-white')}>
-                  Commencer
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <Link href={'/billing?plan=' + plan.id} className={'block text-center w-full py-3 rounded-xl font-semibold ' + (plan.featured ? 'bg-violet-600 text-white' : 'bg-white/[0.08] text-white')}>
-                  Souscrire
-                </Link>
-              </SignedIn>
+              <Link href={'/billing?plan=' + plan.id} className={'block text-center w-full py-3 rounded-xl font-semibold ' + (plan.featured ? 'bg-violet-600 text-white' : 'bg-white/[0.08] text-white')}>
+                Souscrire
+              </Link>
             </div>
           ))}
         </div>
