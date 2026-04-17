@@ -1,63 +1,52 @@
 // @ts-nocheck
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe, PLANS, type PlanType } from '@/lib/stripe'
-import { getOrCreateProfile } from '@/lib/actions/profile'
-import { createAdminClient } from '@/lib/supabase/server'
+import { auth } from '@clerk/nextjs/server'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2024-12-18.acacia' as any,
+})
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
 
-  const { plan, interval = 'monthly' } = await req.json()
+    const body = await req.json()
+    const { plan } = body
 
-  if (!plan || !PLANS[plan as PlanType]) {
-    return NextResponse.json({ error: 'Plan invalide' }, { status: 400 })
-  }
+    // Choisir le bon Price ID selon le plan
+    const priceId = plan === 'yearly'
+      ? process.env.STRIPE_PRICE_YEARLY
+      : process.env.STRIPE_PRICE_MONTHLY
 
-  const profile = await getOrCreateProfile()
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    if (!priceId) {
+      return NextResponse.json({ error: 'Price ID non configuré pour ' + plan }, { status: 500 })
+    }
 
-  const planConfig = PLANS[plan as PlanType]
-  if (!('stripePriceId' in planConfig)) {
-    return NextResponse.json({ error: 'Plan gratuit ne nécessite pas de paiement' }, { status: 400 })
-  }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finoracomptabilite.com'
 
-  const priceId = planConfig.stripePriceId[interval as 'monthly' | 'yearly']
-
-  // Créer ou récupérer le customer Stripe
-  let customerId = profile.stripe_customer_id
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: profile.email,
-      name: profile.full_name || undefined,
-      metadata: { clerk_user_id: userId, profile_id: profile.id },
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: appUrl + '/dashboard?success=true',
+      cancel_url: appUrl + '/billing?canceled=true',
+      client_reference_id: userId,
+      metadata: { userId, plan },
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+      locale: 'fr',
     })
-    customerId = customer.id
 
-    const admin = createAdminClient()
-    await admin
-      .from('profiles')
-      .update({ stripe_customer_id: customerId })
-      .eq('id', profile.id)
+    return NextResponse.json({ url: session.url })
+  } catch (error: any) {
+    console.error('Stripe checkout error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Erreur lors de la création du checkout' },
+      { status: 500 }
+    )
   }
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${baseUrl}/dashboard?upgraded=1`,
-    cancel_url: `${baseUrl}/billing?cancelled=1`,
-    metadata: { profile_id: profile.id, plan, interval },
-    subscription_data: {
-      metadata: { profile_id: profile.id, plan },
-    },
-    locale: 'fr',
-    allow_promotion_codes: true,
-  })
-
-  return NextResponse.json({ url: session.url })
 }
