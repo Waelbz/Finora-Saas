@@ -28,6 +28,15 @@ export default function BankPage() {
     return text
   }
 
+  const datePiece = (date) => {
+    const m = date?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+    if (m) return m[3] + m[2] + m[1]
+    return date?.replace(/[^0-9]/g, '') || ''
+  }
+
+  const fmtMontant = (n) => Math.abs(n || 0).toFixed(3).replace('.', ',')
+  const fmtLib = (s) => (s || '').substring(0, 30).replace(/"/g, "'").trim()
+
   const analyze = async () => {
     if (!file) { setError('Déposez un relevé PDF'); return }
     setLoading(true); setError('')
@@ -41,26 +50,40 @@ export default function BankPage() {
 
     try {
       const b64 = await toBase64(file)
-      const sys = `Tu es un expert-comptable français. Analyse TOUTES les opérations de ce relevé bancaire. Réponds UNIQUEMENT en JSON valide sans texte autour, sans markdown:
-{"banque":"LCL","periode":"Mars 2026","total_debit":1234.56,"total_credit":5678.90,"operations":[{"date":"01/03/2026","libelle":"VIREMENT DUPONT","montant":1500.00,"sens":"C","contrepartie":"411000","libelle_contrepartie":"411DUP"}]}
+      const sys = `Tu es un expert-comptable français senior. Analyse ce relevé bancaire et extrait CHAQUE opération.
 
-Règles contreparties:
-- Virement client reçu → 411000
-- Paiement fournisseur → 401XXX
-- Frais bancaires → 627100
-- URSSAF → 6454000
-- Impôts/TVA → 6370000
-- Virement interne → 511000
-- Inconnu → 471000
+Réponds UNIQUEMENT en JSON valide sans texte autour, sans markdown:
+{"banque":"LCL","periode":"Juillet 2025","total_debit":1234.56,"total_credit":5678.90,"operations":[{"date":"01/07/2025","libelle":"VIR INST RATANA YAY","montant":150.00,"sens":"C","categorie":"client","tiers_nom":"RATANA YAY","libelle_court":"VIR INST RATANA YAY"}]}
 
-Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
+CATÉGORIES:
+- "client" : virement reçu (VIR SEPA/INST personne ou société, Stripe, etc.)
+- "fournisseur" : prélèvement à fournisseur identifié (PRLV SEPA EDF, BOUYGUES, SPB, etc.)
+- "frais_bancaires" : commissions, frais, cotisations, options bancaires
+- "interets_crediteurs" : INTERETS CREDITEURS, RESULTAT ARRETE COMPTE
+- "remise_frais" : LCL A LA CARTE PRO REM, REMISE FRAIS BANCAIR
+- "urssaf" : URSSAF
+- "impots" : impôts, TVA, DGFiP
+- "virement_interne" : virement entre comptes propres
+- "compte_attente" : VIR EMIS D+N AUTO, VIR EMIS D N AUTO
+- "irregularite" : TRAIT.IRREG.FONCT.CTE
+
+CHAMPS:
+- date: "JJ/MM/AAAA"
+- libelle: libellé original complet
+- libelle_court: max 30 caractères pour ARF
+- montant: nombre positif en euros
+- sens: "D" si débit, "C" si crédit
+- categorie: une des valeurs ci-dessus
+- tiers_nom: nom court tiers (3-15 lettres MAJUSCULES) ou null
+
+Sois exhaustif: extrais TOUTES les opérations.`
 
       const resp = await fetch('/api/claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-opus-4-5',
-          max_tokens: 8192,
+          max_tokens: 16384,
           system: sys,
           messages: [{
             role: 'user',
@@ -79,32 +102,61 @@ Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
 
       const data = await resp.json()
       const raw = data.content?.find((b) => b.type === 'text')?.text || ''
-      if (!raw) throw new Error('Réponse vide de l\'IA')
+      if (!raw) throw new Error('Réponse vide')
 
       const jsonStr = extractJSON(raw)
       let parsed
-      try {
-        parsed = JSON.parse(jsonStr)
-      } catch (parseErr) {
-        console.error('Raw response:', raw)
-        throw new Error('JSON invalide. Réponse: ' + raw.substring(0, 200))
+      try { parsed = JSON.parse(jsonStr) }
+      catch (parseErr) {
+        console.error('Raw:', raw)
+        throw new Error('JSON invalide: ' + raw.substring(0, 200))
       }
 
       if (!parsed.operations || !Array.isArray(parsed.operations) || parsed.operations.length === 0) {
         throw new Error('Aucune opération détectée')
       }
 
+      const J = (journal || 'BNQ').toUpperCase()
       const arfLines = []
-      parsed.operations.forEach((op, i) => {
-        const piece = 'REL' + String(i+1).padStart(4,'0')
-        const libelle = (op.libelle || '').substring(0, 30).replace(/"/g, "'")
-        const montant = Math.abs(op.montant).toFixed(3).replace('.', ',')
-        if (op.sens === 'C') {
-          arfLines.push('\t' + op.date + ' ' + journal + ' 512000 "' + piece + '" "' + libelle + '" D ' + montant + ' E')
-          arfLines.push('\t' + op.date + ' ' + journal + ' ' + op.contrepartie + ' "' + piece + '" "' + libelle + '" C ' + montant + ' E')
+
+      parsed.operations.forEach((op) => {
+        const piece = datePiece(op.date)
+        const lib = fmtLib(op.libelle_court || op.libelle)
+        const mt = fmtMontant(op.montant)
+        const cat = op.categorie || 'compte_attente'
+        const tiers = (op.tiers_nom || '').replace(/[^A-Z0-9]/gi, '').toUpperCase()
+
+        let compteContrepartie = '471000'
+        let libelleContrepartie = lib
+
+        if (cat === 'client') {
+          compteContrepartie = '411000'
+          libelleContrepartie = 'CLIENT ' + (tiers || 'DIVERS')
+        } else if (cat === 'fournisseur') {
+          const code = tiers.substring(0, 3) || 'DIV'
+          compteContrepartie = '401' + code
+          libelleContrepartie = (op.tiers_nom || lib).substring(0, 30)
+        } else if (cat === 'frais_bancaires' || cat === 'interets_crediteurs') {
+          compteContrepartie = '627100'
+        } else if (cat === 'remise_frais') {
+          compteContrepartie = '627100'
+          libelleContrepartie = 'REMISE FRAIS BANCAIR'
+        } else if (cat === 'urssaf') {
+          compteContrepartie = '6454000'
+        } else if (cat === 'impots') {
+          compteContrepartie = '6370000'
+        } else if (cat === 'virement_interne') {
+          compteContrepartie = '511000'
         } else {
-          arfLines.push('\t' + op.date + ' ' + journal + ' 512000 "' + piece + '" "' + libelle + '" C ' + montant + ' E')
-          arfLines.push('\t' + op.date + ' ' + journal + ' ' + op.contrepartie + ' "' + piece + '" "' + libelle + '" D ' + montant + ' E')
+          compteContrepartie = '471000'
+        }
+
+        if (op.sens === 'C') {
+          arfLines.push('\t' + op.date + ' ' + J + ' 512000 "' + piece + '" "' + lib + '" D ' + mt + ' E ')
+          arfLines.push('\t' + op.date + ' ' + J + ' ' + compteContrepartie + ' "' + piece + '" "' + libelleContrepartie + '" C ' + mt + ' E ')
+        } else {
+          arfLines.push('\t' + op.date + ' ' + J + ' ' + compteContrepartie + ' "' + piece + '" "' + libelleContrepartie + '" D ' + mt + ' E ')
+          arfLines.push('\t' + op.date + ' ' + J + ' 512000 "' + piece + '" "' + lib + '" C ' + mt + ' E ')
         }
       })
 
@@ -125,8 +177,7 @@ Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
 
   const copyARF = async () => {
     await navigator.clipboard.writeText(buildARF())
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
   const downloadARF = () => {
@@ -201,12 +252,7 @@ Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
                   onChange={e => setJournal(e.target.value.toUpperCase())}
                 />
               </div>
-              <button
-                onClick={analyze}
-                disabled={!file || loading}
-                style={{backgroundColor: (!file || loading) ? '#4c1d95' : '#6c47ff', color: 'white'}}
-                className="h-10 px-6 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
-              >
+              <button onClick={analyze} disabled={!file || loading} style={{backgroundColor: (!file || loading) ? '#4c1d95' : '#6c47ff', color: 'white'}} className="h-10 px-6 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse…</> : <><CheckCircle className="w-4 h-4" /> Analyser</>}
               </button>
             </div>
@@ -242,7 +288,7 @@ Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
             </div>
 
             <div style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)'}} className="rounded-xl p-3 text-sm">
-              <strong style={{color: 'white'}}>{result.operations?.length || 0}</strong> opération(s) extraite(s)
+              <strong style={{color: 'white'}}>{result.operations?.length || 0}</strong> opération(s) · <strong style={{color: 'white'}}>{result.arf_lines?.length || 0}</strong> lignes ARF
             </div>
 
             <div className="flex gap-3">
