@@ -10,31 +10,21 @@ export default function BankPage() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const fileRef = useRef(null)
   const [drag, setDrag] = useState(false)
+  const fileRef = useRef(null)
 
   const handleFile = (f) => {
     if (f.type !== 'application/pdf') { setError('PDF uniquement'); return }
     setFile(f); setResult(null); setError('')
   }
 
-  const handleDrop = (e) => {
-    e.preventDefault(); setDrag(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
-  }
-
   const extractJSON = (text) => {
-    // Essayer d'extraire le JSON depuis la réponse Claude
-    // 1. Si entre ```json ... ```
-    const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
-    if (codeBlockMatch) return codeBlockMatch[1]
-    // 2. Premier { jusqu'au } final équilibré
-    const firstBrace = text.indexOf('{')
-    const lastBrace = text.lastIndexOf('}')
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      return text.substring(firstBrace, lastBrace + 1)
-    }
+    if (!text) return null
+    const codeMatch = text.match(/\`\`\`(?:json)?\s*(\{[\s\S]*?\})\s*\`\`\`/)
+    if (codeMatch) return codeMatch[1]
+    const first = text.indexOf('{')
+    const last = text.lastIndexOf('}')
+    if (first !== -1 && last > first) return text.substring(first, last + 1)
     return text
   }
 
@@ -51,40 +41,19 @@ export default function BankPage() {
 
     try {
       const b64 = await toBase64(file)
+      const sys = `Tu es un expert-comptable français. Analyse TOUTES les opérations de ce relevé bancaire. Réponds UNIQUEMENT en JSON valide sans texte autour, sans markdown:
+{"banque":"LCL","periode":"Mars 2026","total_debit":1234.56,"total_credit":5678.90,"operations":[{"date":"01/03/2026","libelle":"VIREMENT DUPONT","montant":1500.00,"sens":"C","contrepartie":"411000","libelle_contrepartie":"411DUP"}]}
 
-      const sys = `Tu es un expert-comptable français. Analyse le relevé bancaire fourni et extrait TOUTES les opérations.
-
-IMPORTANT : Tu dois répondre UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, sans backticks markdown.
-
-Format JSON exact attendu:
-{
-  "banque": "LCL",
-  "periode": "Mars 2026",
-  "total_debit": 1234.56,
-  "total_credit": 5678.90,
-  "operations": [
-    {
-      "date": "01/03/2026",
-      "libelle": "VIREMENT CLIENT DUPONT",
-      "montant": 1500.00,
-      "sens": "C",
-      "contrepartie": "411000",
-      "libelle_contrepartie": "411DUP"
-    }
-  ]
-}
-
-Règles de classement des contreparties:
-- Virements clients reçus → 411000
-- Paiements fournisseurs → 401XXX (XXX = 3 premières lettres du fournisseur)
+Règles contreparties:
+- Virement client reçu → 411000
+- Paiement fournisseur → 401XXX
 - Frais bancaires → 627100
 - URSSAF → 6454000
-- Impôts / TVA → 6370000
-- Virements internes → 511000
+- Impôts/TVA → 6370000
+- Virement interne → 511000
 - Inconnu → 471000
 
-Sens: "D" pour débit (sortie d'argent), "C" pour crédit (entrée d'argent).
-Montant: toujours positif, en euros, 2 décimales.`
+Sens: "D"=débit, "C"=crédit. Montant toujours positif.`
 
       const resp = await fetch('/api/claude', {
         method: 'POST',
@@ -97,7 +66,7 @@ Montant: toujours positif, en euros, 2 décimales.`
             role: 'user',
             content: [
               { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-              { type: 'text', text: 'Analyse ce relevé bancaire et retourne UNIQUEMENT le JSON.' }
+              { type: 'text', text: 'Analyse ce relevé et retourne UNIQUEMENT le JSON.' }
             ]
           }]
         })
@@ -110,10 +79,7 @@ Montant: toujours positif, en euros, 2 décimales.`
 
       const data = await resp.json()
       const raw = data.content?.find((b) => b.type === 'text')?.text || ''
-
-      if (!raw) {
-        throw new Error('Réponse vide de l\'IA')
-      }
+      if (!raw) throw new Error('Réponse vide de l\'IA')
 
       const jsonStr = extractJSON(raw)
       let parsed
@@ -121,14 +87,13 @@ Montant: toujours positif, en euros, 2 décimales.`
         parsed = JSON.parse(jsonStr)
       } catch (parseErr) {
         console.error('Raw response:', raw)
-        throw new Error('JSON invalide de l\'IA. Réponse: ' + raw.substring(0, 200))
+        throw new Error('JSON invalide. Réponse: ' + raw.substring(0, 200))
       }
 
-      if (!parsed.operations || !Array.isArray(parsed.operations)) {
-        throw new Error('Aucune opération détectée dans le relevé')
+      if (!parsed.operations || !Array.isArray(parsed.operations) || parsed.operations.length === 0) {
+        throw new Error('Aucune opération détectée')
       }
 
-      // Générer lignes ARF
       const arfLines = []
       parsed.operations.forEach((op, i) => {
         const piece = 'REL' + String(i+1).padStart(4,'0')
@@ -145,8 +110,8 @@ Montant: toujours positif, en euros, 2 décimales.`
 
       setResult({ ...parsed, arf_lines: arfLines })
     } catch (e) {
-      console.error('Bank analyze error:', e)
-      setError(e.message || 'Erreur lors de l\'analyse')
+      console.error('Bank error:', e)
+      setError(e.message || 'Erreur')
     } finally {
       setLoading(false)
     }
@@ -154,7 +119,8 @@ Montant: toujours positif, en euros, 2 décimales.`
 
   const buildARF = () => {
     if (!result) return ''
-    return 'COMPTABILITE "dossier"  DU 01/01/2026  AU  31/12/2026\nPLAN COMPTABLE\nECRITURES\n' + result.arf_lines.join('\n')
+    const year = new Date().getFullYear()
+    return 'COMPTABILITE "dossier"  DU 01/01/' + year + '  AU  31/12/' + year + '\nPLAN COMPTABLE\nECRITURES\n' + result.arf_lines.join('\n')
   }
 
   const copyARF = async () => {
@@ -168,7 +134,8 @@ Montant: toujours positif, en euros, 2 décimales.`
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = 'releve_' + journal + '_' + Date.now() + '.txt'
-    a.click(); URL.revokeObjectURL(url)
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -188,25 +155,32 @@ Montant: toujours positif, en euros, 2 décimales.`
       <div className="p-8 max-w-3xl">
         {!result && (
           <div className="space-y-5">
-            <label
+            <div
               style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '2px dashed ' + (drag ? '#6c47ff' : 'rgba(255,255,255,0.15)')}}
               className="block cursor-pointer rounded-2xl p-10 text-center transition-all"
-              onDragOver={e => { e.preventDefault(); setDrag(true) }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={handleDrop}
+              onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setDrag(true) }}
+              onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDrag(true) }}
+              onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDrag(false) }}
+              onDrop={e => { e.preventDefault(); e.stopPropagation(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
               onClick={() => fileRef.current?.click()}
             >
-              <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-              <div className="flex flex-col items-center gap-3">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                style={{position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none'}}
+                onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = '' }}
+              />
+              <div className="flex flex-col items-center gap-3" style={{pointerEvents: 'none'}}>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1))'}}>
                   <Landmark className="w-7 h-7" style={{color: '#10b981'}} />
                 </div>
                 <div>
-                  <div className="font-semibold" style={{color: 'white'}}>Déposer un relevé bancaire</div>
+                  <div className="font-semibold" style={{color: 'white'}}>Cliquez ou glissez votre relevé bancaire</div>
                   <div className="text-sm mt-1" style={{color: 'rgba(255,255,255,0.4)'}}>PDF uniquement · LCL, BNP, SG, CIC, CA…</div>
                 </div>
               </div>
-            </label>
+            </div>
 
             {file && (
               <div className="flex items-center gap-3 p-4 rounded-xl" style={{backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)'}}>
@@ -225,7 +199,6 @@ Montant: toujours positif, en euros, 2 décimales.`
                   value={journal}
                   maxLength={6}
                   onChange={e => setJournal(e.target.value.toUpperCase())}
-                  placeholder="BNQ"
                 />
               </div>
               <button
@@ -260,15 +233,15 @@ Montant: toujours positif, en euros, 2 décimales.`
               </div>
               <div style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)'}} className="rounded-xl p-3">
                 <div className="text-[10px] uppercase" style={{color: 'rgba(255,255,255,0.4)'}}>Débit</div>
-                <div className="font-bold" style={{color: 'white'}}>{result.total_debit?.toFixed(2)} €</div>
+                <div className="font-bold" style={{color: 'white'}}>{result.total_debit?.toFixed(2) || '0.00'} €</div>
               </div>
               <div style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)'}} className="rounded-xl p-3">
                 <div className="text-[10px] uppercase" style={{color: 'rgba(255,255,255,0.4)'}}>Crédit</div>
-                <div className="font-bold" style={{color: 'white'}}>{result.total_credit?.toFixed(2)} €</div>
+                <div className="font-bold" style={{color: 'white'}}>{result.total_credit?.toFixed(2) || '0.00'} €</div>
               </div>
             </div>
 
-            <div style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)'}} className="rounded-xl p-3 text-sm" style={{color: 'rgba(255,255,255,0.7)'}}>
+            <div style={{backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)'}} className="rounded-xl p-3 text-sm">
               <strong style={{color: 'white'}}>{result.operations?.length || 0}</strong> opération(s) extraite(s)
             </div>
 
@@ -280,6 +253,8 @@ Montant: toujours positif, en euros, 2 décimales.`
                 <Download className="w-4 h-4" /> Télécharger ARF
               </button>
             </div>
+
+            <pre style={{backgroundColor: '#0a0d14', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', maxHeight: '400px'}} className="rounded-xl p-4 mt-2 font-mono text-xs whitespace-pre-wrap break-all overflow-y-auto">{buildARF()}</pre>
           </div>
         )}
       </div>
